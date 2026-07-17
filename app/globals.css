@@ -1,0 +1,118 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+ * Design tokens — single source of truth for the whole app.
+ * Values are space-separated RGB channels so Tailwind's `<alpha-value>`
+ * modifier works (e.g. bg-accent/10).
+ *
+ * Palette: restrained near-monochrome, dark by default. One accent: violet.
+ *   light accent  #6D28D9  -> 109 40 217
+ *   dark accent   #A78BFA  -> 167 139 250
+ * No glow, no glass, no decorative gradients.
+ */
+
+:root {
+  /* Light mode (secondary; dark is default via .dark on <html>) */
+  --bg: 255 255 255;
+  --bg-subtle: 248 248 250;
+  --bg-elevated: 255 255 255;
+
+  --border: 231 231 236;
+  --border-strong: 214 214 221;
+
+  --fg: 24 24 27;
+  --fg-muted: 82 82 91;
+  --fg-subtle: 133 133 143;
+
+  --accent: 109 40 217; /* #6D28D9 */
+  --accent-fg: 255 255 255;
+  --accent-subtle: 243 238 253;
+
+  --success: 21 128 61;
+  --success-subtle: 233 245 237;
+  --warning: 180 118 6;
+  --warning-subtle: 250 244 232;
+  --danger: 190 40 50;
+  --danger-subtle: 251 236 237;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: "SFMono-Regular", ui-monospace, "JetBrains Mono", "Menlo",
+    "Consolas", monospace;
+}
+
+.dark {
+  --bg: 14 14 16;
+  --bg-subtle: 20 20 23;
+  --bg-elevated: 26 26 30;
+
+  --border: 39 39 44;
+  --border-strong: 55 55 62;
+
+  --fg: 237 237 240;
+  --fg-muted: 161 161 170;
+  --fg-subtle: 112 112 122;
+
+  --accent: 167 139 250; /* #A78BFA */
+  --accent-fg: 20 20 23;
+  --accent-subtle: 34 28 54;
+
+  --success: 74 190 120;
+  --success-subtle: 22 38 30;
+  --warning: 214 162 74;
+  --warning-subtle: 40 33 20;
+  --danger: 232 106 114;
+  --danger-subtle: 42 24 27;
+}
+
+* {
+  border-color: rgb(var(--border));
+}
+
+html {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background-color: rgb(var(--bg));
+  color: rgb(var(--fg));
+  font-family: var(--font-sans);
+}
+
+::selection {
+  background-color: rgb(var(--accent) / 0.28);
+}
+
+/* Thin, unobtrusive scrollbars in the Linear spirit */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(var(--border-strong)) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background-color: rgb(var(--border-strong));
+  border-radius: 9999px;
+  border: 3px solid rgb(var(--bg));
+}
+
+/* Focus ring — accessible, on-brand */
+:focus-visible {
+  outline: 2px solid rgb(var(--accent));
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
