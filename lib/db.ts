@@ -2,8 +2,8 @@ import Dexie, { type Table } from "dexie";
 import type {
   CardProgress,
   DailyLog,
-  Settings,
   DailyProblemLog,
+  ProblemAttempt,
 } from "./types";
 
 // A tiny key/value row wrapper for singletons (settings).
@@ -21,6 +21,7 @@ export class RoteDB extends Dexie {
   progress!: Table<CardProgress, string>; // keyed by cardId
   dailyLogs!: Table<DailyLog, string>; // keyed by date
   dailyProblems!: Table<DailyProblemLog, string>; // keyed by date
+  problemAttempts!: Table<ProblemAttempt, string>; // keyed by slug
   kv!: Table<KV, string>; // singletons: settings
 
   constructor() {
@@ -30,6 +31,12 @@ export class RoteDB extends Dexie {
       dailyLogs: "date",
       dailyProblems: "date, problemId, status",
       kv: "key",
+    });
+    // v2: add problem-list tracking. Only ADDS a table — the v1 stores are
+    // untouched, so existing syntax-card progress/logs/settings survive the
+    // upgrade with no data transform needed.
+    this.version(2).stores({
+      problemAttempts: "slug, status, srsDueAt",
     });
   }
 }

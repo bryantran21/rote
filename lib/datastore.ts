@@ -5,6 +5,7 @@ import type {
   Settings,
   Problem,
   DailyProblemLog,
+  ProblemAttempt,
 } from "./types";
 import { DEFAULT_SETTINGS } from "./types";
 import { CARDS } from "@/content/cards";
@@ -12,6 +13,7 @@ import { PROBLEMS } from "@/content/problems";
 import { db } from "./db";
 import { todayISO } from "./date";
 import { computeTopicMastery } from "./mastery";
+import { isAttemptDue, setAttemptStatus } from "./problemReview";
 
 /**
  * The single seam between the app and persistence. ALL reads/writes go through
@@ -50,6 +52,15 @@ export interface DataStore {
   /** Official daily challenge — Phase 3 seam; returns null in Phase 1. */
   getOfficialDaily(): Promise<Problem | null>;
 
+  // --- problem-list tracking ---
+  getProblemAttempts(): Promise<ProblemAttempt[]>;
+  getProblemAttempt(slug: string): Promise<ProblemAttempt | undefined>;
+  saveProblemAttempt(attempt: ProblemAttempt): Promise<void>;
+  /** Attempts whose review is due on/before `date` (excludes graduated). */
+  getDueProblemAttempts(date?: string): Promise<ProblemAttempt[]>;
+  /** Bulk-mark a set of slugs solved (for importing existing progress). */
+  bulkMarkSolved(slugs: string[]): Promise<void>;
+
   // --- data management ---
   resetProgress(): Promise<void>;
   exportData(): Promise<ExportBundle>;
@@ -57,12 +68,13 @@ export interface DataStore {
 }
 
 export interface ExportBundle {
-  version: 1;
+  version: 2;
   exportedAt: string;
   settings: Settings;
   progress: CardProgress[];
   dailyLogs: DailyLog[];
   dailyProblems: DailyProblemLog[];
+  problemAttempts: ProblemAttempt[];
 }
 
 const SETTINGS_KEY = "settings";
@@ -140,39 +152,69 @@ class DexieDataStore implements DataStore {
     return null;
   }
 
+  async getProblemAttempts(): Promise<ProblemAttempt[]> {
+    return db().problemAttempts.toArray();
+  }
+  async getProblemAttempt(slug: string): Promise<ProblemAttempt | undefined> {
+    return db().problemAttempts.get(slug);
+  }
+  async saveProblemAttempt(attempt: ProblemAttempt): Promise<void> {
+    await db().problemAttempts.put(attempt);
+  }
+  async getDueProblemAttempts(date = todayISO()): Promise<ProblemAttempt[]> {
+    const all = await db().problemAttempts.toArray();
+    return all.filter((a) => isAttemptDue(a, date));
+  }
+  async bulkMarkSolved(slugs: string[]): Promise<void> {
+    await db().transaction("rw", db().problemAttempts, async () => {
+      for (const slug of slugs) {
+        const prev = await db().problemAttempts.get(slug);
+        await db().problemAttempts.put(setAttemptStatus(prev, slug, "solved"));
+      }
+    });
+  }
+
   async resetProgress(): Promise<void> {
     await db().transaction(
       "rw",
       db().progress,
       db().dailyLogs,
       db().dailyProblems,
+      db().problemAttempts,
       async () => {
         await db().progress.clear();
         await db().dailyLogs.clear();
         await db().dailyProblems.clear();
+        await db().problemAttempts.clear();
       },
     );
   }
 
   async exportData(): Promise<ExportBundle> {
-    const [settings, progress, dailyLogs, dailyProblems] = await Promise.all([
-      this.getSettings(),
-      this.getAllProgress(),
-      this.getDailyLogs(),
-      this.getDailyProblemHistory(),
-    ]);
+    const [settings, progress, dailyLogs, dailyProblems, problemAttempts] =
+      await Promise.all([
+        this.getSettings(),
+        this.getAllProgress(),
+        this.getDailyLogs(),
+        this.getDailyProblemHistory(),
+        this.getProblemAttempts(),
+      ]);
     return {
-      version: 1,
+      version: 2,
       exportedAt: new Date().toISOString(),
       settings,
       progress,
       dailyLogs,
       dailyProblems,
+      problemAttempts,
     };
   }
 
   async importData(bundle: ExportBundle): Promise<void> {
-    if (!bundle || bundle.version !== 1) {
+    // Accept v1 (pre-problem-tracking) and v2 backups; missing tables default
+    // to empty so an older export imports cleanly.
+    const version = (bundle as unknown as { version?: number })?.version;
+    if (version !== 1 && version !== 2) {
       throw new Error("Unrecognized export format.");
     }
     await db().transaction(
@@ -180,14 +222,17 @@ class DexieDataStore implements DataStore {
       db().progress,
       db().dailyLogs,
       db().dailyProblems,
+      db().problemAttempts,
       db().kv,
       async () => {
         await db().progress.clear();
         await db().dailyLogs.clear();
         await db().dailyProblems.clear();
+        await db().problemAttempts.clear();
         await db().progress.bulkPut(bundle.progress ?? []);
         await db().dailyLogs.bulkPut(bundle.dailyLogs ?? []);
         await db().dailyProblems.bulkPut(bundle.dailyProblems ?? []);
+        await db().problemAttempts.bulkPut(bundle.problemAttempts ?? []);
         await db().kv.put({
           key: SETTINGS_KEY,
           value: { ...DEFAULT_SETTINGS, ...(bundle.settings ?? {}) },

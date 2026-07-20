@@ -81,6 +81,29 @@ export interface DailyProblemLog {
   reason?: string; // the "why this problem" string
 }
 
+// ---- Problem-list tracking (curated list progress + SRS review) ----
+
+export type ProblemStatus = "unsolved" | "solved" | "needs-review";
+
+/**
+ * Per-problem user state, keyed by slug. Confidence (1–5) drives the SRS review
+ * schedule, reusing the same Leitner box intervals as the syntax cards
+ * (see lib/problemReview.ts). srsDueAt is unset once a problem graduates
+ * (confidence 5), which removes it from the review queue.
+ */
+export interface ProblemAttempt {
+  slug: string; // primary key — matches Problem.slug
+  status: ProblemStatus;
+  firstSolvedAt?: string; // ISO date-time
+  lastSolvedAt?: string; // ISO date-time
+  attempts: number;
+  timeSpentMin: number;
+  confidence?: number; // 1..5
+  notes?: string;
+  srsInterval?: number; // days until next review (from box intervals)
+  srsDueAt?: string; // ISO date (YYYY-MM-DD); unset when graduated
+}
+
 export const DEFAULT_SETTINGS: Settings = {
   dailyGoal: 20,
   boxIntervals: [0, 1, 3, 7, 16],
