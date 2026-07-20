@@ -266,11 +266,67 @@ async function enrichFromLeetCode(
   }
 }
 
+/*
+ * ⚠️ PARETO 50 — APPROXIMATE, NEEDS VERIFICATION.
+ *
+ * We do NOT have a reliable copy of NeetCode's official "Pareto" list, so the
+ * set below is a high-confidence CORE subset: problems that appear on virtually
+ * every "if you only do N problems" short list (the Blind-75 fundamentals). It
+ * is intentionally PARTIAL — ~26 of a nominal 50 — rather than guessed.
+ *
+ * TODO(owner): replace/extend with the official Pareto-50 slugs. Any slug added
+ * here that also exists in SEED gets `pareto50` in its `lists`. Slugs listed
+ * that are NOT yet in SEED are flagged at build time (see the warning below).
+ */
+const PARETO50_SLUGS: string[] = [
+  "two-sum",
+  "valid-anagram",
+  "contains-duplicate",
+  "group-anagrams",
+  "top-k-frequent-elements",
+  "product-of-array-except-self",
+  "valid-palindrome",
+  "3sum",
+  "container-with-most-water",
+  "best-time-to-buy-and-sell-stock",
+  "longest-substring-without-repeating-characters",
+  "valid-parentheses",
+  "binary-search",
+  "reverse-linked-list",
+  "merge-two-sorted-lists",
+  "linked-list-cycle",
+  "invert-binary-tree",
+  "maximum-depth-of-binary-tree",
+  "same-tree",
+  "binary-tree-level-order-traversal",
+  "number-of-islands",
+  "climbing-stairs",
+  "coin-change",
+  "maximum-subarray",
+  "merge-intervals",
+  "single-number",
+];
+
 async function main() {
+  const pareto = new Set(PARETO50_SLUGS);
+  const seedSlugs = new Set(SEED.map((s) => s.slug));
+
+  // Flag any Pareto slug we couldn't attach because it's missing from SEED.
+  const orphanPareto = PARETO50_SLUGS.filter((s) => !seedSlugs.has(s));
+  if (orphanPareto.length) {
+    console.log(
+      "⚠ pareto50 slugs not present in SEED (add them to SEED to include):",
+      orphanPareto,
+    );
+  }
+
   const problems: Problem[] = SEED.map((seed) => {
     // Curated grouping wins; fall back to tag derivation if none given.
     const appTopics =
       seed.topics.length > 0 ? seed.topics : tagsToTopics(seed.tags);
+    const lists = pareto.has(seed.slug)
+      ? [...seed.lists, "pareto50"]
+      : seed.lists;
     return {
       id: String(seed.id),
       frontendId: seed.id,
@@ -280,7 +336,7 @@ async function main() {
       leetcodeTags: seed.tags,
       appTopics,
       paidOnly: Boolean(seed.paid),
-      lists: seed.lists,
+      lists,
       url: `https://leetcode.com/problems/${seed.slug}/`,
     };
   });
