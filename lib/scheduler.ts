@@ -1,4 +1,4 @@
-import type { Card, CardProgress, Settings } from "./types";
+import type { Card, CardProgress, DrillFormat, Settings } from "./types";
 import { todayISO, addDays, isDue } from "./date";
 
 // Leitner spaced repetition, 5 boxes.
@@ -10,6 +10,12 @@ export const MAX_BOX = 5;
 export function nextBox(currentBox: number, correct: boolean): number {
   if (!correct) return 1;
   return Math.min(currentBox + 1, MAX_BOX);
+}
+
+/** Clamp a 1–5 confidence rating into a valid Leitner box. Shared by the
+ * syntax-card grade loop and the problem review scheduler. */
+export function confidenceToBox(confidence: number): number {
+  return Math.max(1, Math.min(MAX_BOX, Math.round(confidence)));
 }
 
 export function dueDateForBox(
@@ -50,9 +56,16 @@ export function applyGrade(
   correct: boolean,
   settings: Settings,
   now: string = todayISO(),
+  confidence?: number,
 ): GradeOutcome {
   const base = prev ?? newProgress(card.id);
-  const toBox = nextBox(base.box, correct);
+  // Wrong -> box 1. Correct with a confidence rating -> that box (reuses the
+  // shared confidence→box map). Correct without a rating -> classic box + 1.
+  const toBox = !correct
+    ? 1
+    : confidence != null
+      ? confidenceToBox(confidence)
+      : nextBox(base.box, true);
   return {
     progress: {
       cardId: card.id,
@@ -71,13 +84,22 @@ export function applyGrade(
 export interface QueueOptions {
   /** Restrict to a single topic (per-topic drilling). */
   topic?: string;
+  /** Restrict to one card format. 'mixed' (or undefined) includes both. */
+  format?: DrillFormat;
+  /**
+   * Session length cap. When set, the queue is capped at this many cards total
+   * (due first). When omitted, falls back to Settings.dailyGoal for new cards
+   * (the classic daily flow).
+   */
+  limit?: number;
   today?: string;
 }
 
 /**
  * Build the day's queue: all DUE cards first (earliest due first, then lower
- * box first), then NEW (never-seen) cards, capped so new cards only fill up to
- * the daily goal. Due cards are never dropped even if they exceed the goal.
+ * box first), then NEW (never-seen) cards. With `limit` set, the whole queue is
+ * capped at that many cards; otherwise new cards fill up to the daily goal and
+ * due cards are never dropped.
  */
 export function buildDailyQueue(
   cards: Card[],
@@ -86,9 +108,10 @@ export function buildDailyQueue(
   opts: QueueOptions = {},
 ): Card[] {
   const today = opts.today ?? todayISO();
-  const pool = opts.topic
-    ? cards.filter((c) => c.topic === opts.topic)
-    : cards;
+  let pool = opts.topic ? cards.filter((c) => c.topic === opts.topic) : cards;
+  if (opts.format && opts.format !== "mixed") {
+    pool = pool.filter((c) => c.type === opts.format);
+  }
   const progressById = new Map(progress.map((p) => [p.cardId, p]));
 
   const due: { card: Card; p: CardProgress }[] = [];
@@ -110,6 +133,11 @@ export function buildDailyQueue(
   });
 
   const dueCards = due.map((d) => d.card);
+
+  if (opts.limit != null) {
+    const remaining = Math.max(0, opts.limit - dueCards.length);
+    return [...dueCards, ...fresh.slice(0, remaining)].slice(0, opts.limit);
+  }
   const remaining = Math.max(0, settings.dailyGoal - dueCards.length);
   return [...dueCards, ...fresh.slice(0, remaining)];
 }

@@ -1,8 +1,10 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import Link from "next/link";
 import type { Cheatsheet } from "@/lib/cheatsheet";
 import { Markdown } from "@/components/Markdown";
+import { CHEATSHEET_SECTION_TOPIC } from "@/content/cheatsheet-topic-map";
 
 export function CheatsheetView({ data }: { data: Cheatsheet }) {
   const [query, setQuery] = useState("");
@@ -112,22 +114,34 @@ export function CheatsheetView({ data }: { data: Cheatsheet }) {
                   id={s.slug}
                   className="scroll-mt-24 rounded-lg border border-border bg-bg-elevated"
                 >
-                  <button
-                    onClick={() => toggle(s.slug)}
-                    className="flex w-full items-center justify-between px-5 py-3 text-left"
-                  >
-                    <h2 className="text-sm font-semibold text-fg">
-                      {s.title}
-                    </h2>
-                    <span
-                      className={`text-fg-subtle transition-transform ${
-                        isCollapsed ? "" : "rotate-90"
-                      }`}
-                      aria-hidden
+                  <div className="flex items-center gap-3 px-5 py-3">
+                    <button
+                      onClick={() => toggle(s.slug)}
+                      className="flex flex-1 items-center justify-between text-left"
                     >
-                      ›
-                    </span>
-                  </button>
+                      <h2 className="text-sm font-semibold text-fg">
+                        {s.title}
+                      </h2>
+                      <span
+                        className={`text-fg-subtle transition-transform ${
+                          isCollapsed ? "" : "rotate-90"
+                        }`}
+                        aria-hidden
+                      >
+                        ›
+                      </span>
+                    </button>
+                    {CHEATSHEET_SECTION_TOPIC[s.slug] && (
+                      <Link
+                        href={`/drill?topic=${encodeURIComponent(
+                          CHEATSHEET_SECTION_TOPIC[s.slug],
+                        )}`}
+                        className="shrink-0 text-xs text-accent hover:opacity-80"
+                      >
+                        Drill this →
+                      </Link>
+                    )}
+                  </div>
                   {!isCollapsed && (
                     <div className="border-t border-border px-5 pb-4 pt-1">
                       <Markdown copyable>{s.body}</Markdown>

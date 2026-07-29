@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { Fragment, useMemo, useRef, useState } from "react";
 import type { ProblemDifficulty, ProblemStatus } from "@/lib/types";
 import { PageHeader } from "@/components/PageHeader";
-import { Panel } from "@/components/Panel";
 import { ConfidenceRating } from "@/components/ConfidenceRating";
 import {
   useProblems,
@@ -40,6 +39,7 @@ export default function ProblemsPage() {
     topics,
     rate,
     setStatus,
+    setNotes,
     importSolved,
     exportAttempts,
   } = useProblems();
@@ -51,7 +51,15 @@ export default function ProblemsPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [query, setQuery] = useState("");
   const [msg, setMsg] = useState<string | null>(null);
+  const [notesOpen, setNotesOpen] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const toggleNotes = (slug: string) =>
+    setNotesOpen((prev) => {
+      const next = new Set(prev);
+      next.has(slug) ? next.delete(slug) : next.add(slug);
+      return next;
+    });
 
   const status = (r: ProblemRow): ProblemStatus =>
     r.attempt?.status ?? "unsolved";
@@ -129,12 +137,35 @@ export default function ProblemsPage() {
         }
       />
 
-      {/* Per-list progress */}
+      {/* Primary list filter — pick the set you're studying */}
+      <div className="mb-4 flex flex-wrap gap-1.5">
+        <ListTab active={listFilter === "all"} onClick={() => setListFilter("all")}>
+          All
+        </ListTab>
+        {lists.map((l) => (
+          <ListTab
+            key={l}
+            active={listFilter === l}
+            onClick={() => setListFilter(l)}
+          >
+            {LIST_LABELS[l] ?? l}
+          </ListTab>
+        ))}
+      </div>
+
+      {/* Per-list progress — also clickable to filter */}
       <div className="mb-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {perList.map(({ list, total, solved }) => {
           const pct = total ? Math.round((solved / total) * 100) : 0;
+          const active = listFilter === list;
           return (
-            <Panel key={list} className="p-4">
+            <button
+              key={list}
+              onClick={() => setListFilter(active ? "all" : list)}
+              className={`rounded-lg border bg-bg-elevated p-4 text-left transition-colors ${
+                active ? "border-accent" : "border-border hover:border-border-strong"
+              }`}
+            >
               <div className="flex items-baseline justify-between">
                 <span className="text-sm font-medium text-fg">
                   {LIST_LABELS[list] ?? list}
@@ -149,7 +180,7 @@ export default function ProblemsPage() {
                   style={{ width: `${pct}%` }}
                 />
               </span>
-            </Panel>
+            </button>
           );
         })}
       </div>
@@ -200,13 +231,6 @@ export default function ProblemsPage() {
             placeholder="Search titles…"
             className="w-48 rounded-md border border-border bg-bg-elevated px-3 py-1.5 text-sm outline-none placeholder:text-fg-subtle focus:border-accent"
           />
-          <Filter value={listFilter} onChange={setListFilter} label="List">
-            {lists.map((l) => (
-              <option key={l} value={l}>
-                {LIST_LABELS[l] ?? l}
-              </option>
-            ))}
-          </Filter>
           <Filter value={diffFilter} onChange={setDiffFilter} label="Difficulty">
             <option value="Easy">Easy</option>
             <option value="Medium">Medium</option>
@@ -249,13 +273,19 @@ export default function ProblemsPage() {
                 <Th>Status</Th>
                 <Th className="hidden sm:table-cell">Last solved</Th>
                 <Th>Confidence</Th>
+                <Th>Notes</Th>
               </tr>
             </thead>
             <tbody>
-              {shown.map(({ problem, attempt }) => (
+              {shown.map(({ problem, attempt }) => {
+                const open = notesOpen.has(problem.slug);
+                const hasNotes = Boolean(attempt?.notes?.trim());
+                return (
+                <Fragment key={problem.slug}>
                 <tr
-                  key={problem.slug}
-                  className="border-b border-border last:border-0 hover:bg-bg-subtle/50"
+                  className={`border-b border-border hover:bg-bg-subtle/50 ${
+                    open ? "" : "last:border-0"
+                  }`}
                 >
                   <td className="px-3 py-2.5">
                     <a
@@ -312,8 +342,39 @@ export default function ProblemsPage() {
                       onRate={(c) => rate(problem.slug, c)}
                     />
                   </td>
+                  <td className="px-3 py-2.5">
+                    <button
+                      onClick={() => toggleNotes(problem.slug)}
+                      className={`rounded border px-2 py-1 text-xs transition-colors ${
+                        hasNotes
+                          ? "border-accent/40 text-accent"
+                          : "border-border text-fg-subtle hover:text-fg"
+                      }`}
+                      title={hasNotes ? "Edit notes" : "Add notes"}
+                    >
+                      {open ? "Close" : hasNotes ? "Notes •" : "Notes"}
+                    </button>
+                  </td>
                 </tr>
-              ))}
+                {open && (
+                  <tr className="border-b border-border last:border-0 bg-bg-subtle/40">
+                    <td colSpan={7} className="px-3 pb-3 pt-1">
+                      <textarea
+                        defaultValue={attempt?.notes ?? ""}
+                        onBlur={(e) => setNotes(problem.slug, e.target.value)}
+                        placeholder="Your notes on this problem (approach, edge cases, why you missed it)…"
+                        rows={3}
+                        className="w-full rounded-md border border-border bg-bg px-3 py-2 text-sm outline-none placeholder:text-fg-subtle focus:border-accent"
+                      />
+                      <p className="mt-1 text-xs text-fg-subtle">
+                        Saved when you click away.
+                      </p>
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -342,6 +403,29 @@ function extractSlugs(parsed: unknown): string[] {
     return (parsed as any).slugs.filter((s: unknown): s is string => typeof s === "string");
   }
   return [];
+}
+
+function ListTab({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-md border px-3 py-1.5 text-sm transition-colors ${
+        active
+          ? "border-accent bg-accent-subtle font-medium text-fg"
+          : "border-border text-fg-muted hover:text-fg"
+      }`}
+    >
+      {children}
+    </button>
+  );
 }
 
 function ViewTab({

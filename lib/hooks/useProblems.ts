@@ -19,6 +19,7 @@ export interface UseProblems {
   topics: string[];
   rate: (slug: string, confidence: number) => Promise<void>;
   setStatus: (slug: string, status: ProblemStatus) => Promise<void>;
+  setNotes: (slug: string, notes: string) => Promise<void>;
   importSolved: (slugs: string[]) => Promise<number>;
   exportAttempts: () => Promise<ProblemAttempt[]>;
   refresh: () => void;
@@ -92,6 +93,22 @@ export function useProblems(): UseProblems {
     [persist],
   );
 
+  const setNotes = useCallback(
+    async (slug: string, notes: string) => {
+      const prev = await store().getProblemAttempt(slug);
+      const base =
+        prev ??
+        ({
+          slug,
+          status: "unsolved" as ProblemStatus,
+          attempts: 0,
+          timeSpentMin: 0,
+        } satisfies ProblemAttempt);
+      await persist({ ...base, slug, notes });
+    },
+    [persist],
+  );
+
   const importSolved = useCallback(async (slugs: string[]) => {
     const known = new Set(problems.map((p) => p.slug));
     const valid = slugs.filter((s) => known.has(s));
@@ -111,6 +128,7 @@ export function useProblems(): UseProblems {
     topics,
     rate,
     setStatus,
+    setNotes,
     importSolved,
     exportAttempts,
     refresh,

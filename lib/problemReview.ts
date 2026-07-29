@@ -1,5 +1,5 @@
 import type { ProblemAttempt, ProblemStatus, Settings } from "./types";
-import { dueDateForBox, MAX_BOX } from "./scheduler";
+import { dueDateForBox, MAX_BOX, confidenceToBox } from "./scheduler";
 import { todayISO, isDue } from "./date";
 
 // Confidence-driven review scheduling for tracked LeetCode problems. This is a
@@ -16,10 +16,9 @@ import { todayISO, isDue } from "./date";
 
 export const GRADUATION_CONFIDENCE = 5;
 
-/** Clamp a rating into 1..MAX_BOX and use it directly as the Leitner box. */
-export function confidenceToBox(confidence: number): number {
-  return Math.max(1, Math.min(MAX_BOX, Math.round(confidence)));
-}
+// confidenceToBox is defined in ./scheduler (shared with card grading) and
+// re-exported here so this module stays the one-stop review API.
+export { confidenceToBox };
 
 /** True once the problem no longer needs scheduled review. */
 export function isGraduated(confidence?: number): boolean {
