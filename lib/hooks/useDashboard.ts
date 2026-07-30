@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type { DailyLog, Settings } from "@/lib/types";
+import { DEFAULT_SETTINGS } from "@/lib/types";
 import { store } from "@/lib/datastore";
 import { computeStreak, todayStats, totalReps } from "@/lib/stats";
 import { queueCounts } from "@/lib/scheduler";
@@ -19,14 +20,7 @@ export interface DashboardData {
 
 const EMPTY: DashboardData = {
   loading: true,
-  settings: {
-    dailyGoal: 20,
-    boxIntervals: [0, 1, 3, 7, 16],
-    problemDifficultyCeiling: "Medium",
-    includePaid: false,
-    dailyProblemMode: "personalized",
-    catalogLists: [],
-  },
+  settings: DEFAULT_SETTINGS,
   logs: [],
   mastery: {},
   streak: 0,

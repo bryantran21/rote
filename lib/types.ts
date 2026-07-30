@@ -44,9 +44,16 @@ export interface DailyLog {
   correct: number;
 }
 
+/** Which card formats a drill session includes. */
+export type DrillFormat = "mixed" | "mcq" | "fill";
+
 export interface Settings {
   dailyGoal: number;
   boxIntervals: number[]; // days-until-due per box, index = box-1
+
+  // Drill setup defaults (remembered across sessions)
+  drillFormat: DrillFormat;
+  drillHardMode: boolean; // hide topic/primitive during the question
 
   // Problem-of-the-Day settings (addendum)
   problemDifficultyCeiling: "Easy" | "Medium" | "Hard";
@@ -107,6 +114,8 @@ export interface ProblemAttempt {
 export const DEFAULT_SETTINGS: Settings = {
   dailyGoal: 20,
   boxIntervals: [0, 1, 3, 7, 16],
+  drillFormat: "mixed",
+  drillHardMode: false,
   problemDifficultyCeiling: "Medium",
   includePaid: false,
   dailyProblemMode: "personalized",

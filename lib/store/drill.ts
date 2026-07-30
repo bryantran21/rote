@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import type { Card, Settings } from "@/lib/types";
+import type { Card, DrillFormat, Settings } from "@/lib/types";
 import { store } from "@/lib/datastore";
 import { applyGrade, buildDailyQueue } from "@/lib/scheduler";
 import { todayISO } from "@/lib/date";
@@ -11,9 +11,21 @@ interface GradeRecord {
   correct: boolean;
 }
 
+export interface SessionOptions {
+  topic?: string;
+  format?: DrillFormat; // defaults to settings.drillFormat
+  length?: number; // max cards; undefined = all
+  hardMode?: boolean; // defaults to settings.drillHardMode
+}
+
 interface DrillState {
   status: Status;
+  // Active session config (kept for restart + the card to read hardMode).
   topic?: string;
+  format: DrillFormat;
+  length?: number;
+  hardMode: boolean;
+
   queue: Card[];
   index: number;
   results: GradeRecord[];
@@ -22,8 +34,8 @@ interface DrillState {
 
   current: () => Card | undefined;
 
-  start: (topic?: string) => Promise<void>;
-  grade: (correct: boolean) => Promise<void>;
+  start: (opts?: SessionOptions) => Promise<void>;
+  grade: (correct: boolean, confidence?: number) => Promise<void>;
   next: () => void;
   restart: () => Promise<void>;
   quit: () => void;
@@ -32,6 +44,10 @@ interface DrillState {
 export const useDrill = create<DrillState>((set, get) => ({
   status: "idle",
   topic: undefined,
+  format: "mixed",
+  length: undefined,
+  hardMode: false,
+
   queue: [],
   index: 0,
   results: [],
@@ -43,17 +59,38 @@ export const useDrill = create<DrillState>((set, get) => ({
     return queue[index];
   },
 
-  start: async (topic) => {
-    set({ status: "loading", topic });
+  start: async (opts = {}) => {
+    set({ status: "loading" });
     const ds = store();
     const [cards, progress, settings] = await Promise.all([
       ds.getCards(),
       ds.getAllProgress(),
       ds.getSettings(),
     ]);
-    const queue = buildDailyQueue(cards, progress, settings, { topic });
+
+    const format = opts.format ?? settings.drillFormat;
+    const hardMode = opts.hardMode ?? settings.drillHardMode;
+
+    // Remember the chosen format + hard mode as the next session's defaults.
+    if (
+      format !== settings.drillFormat ||
+      hardMode !== settings.drillHardMode
+    ) {
+      await ds.saveSettings({ drillFormat: format, drillHardMode: hardMode });
+    }
+
+    const queue = buildDailyQueue(cards, progress, settings, {
+      topic: opts.topic,
+      format,
+      limit: opts.length,
+    });
+
     set({
       settings,
+      topic: opts.topic,
+      format,
+      length: opts.length,
+      hardMode,
       queue,
       index: 0,
       results: [],
@@ -62,14 +99,21 @@ export const useDrill = create<DrillState>((set, get) => ({
     });
   },
 
-  grade: async (correct) => {
+  grade: async (correct, confidence) => {
     const { queue, index, settings, results, promoted } = get();
     const card = queue[index];
     if (!card || !settings) return;
 
     const ds = store();
     const prev = await ds.getProgress(card.id);
-    const outcome = applyGrade(prev, card, correct, settings, todayISO());
+    const outcome = applyGrade(
+      prev,
+      card,
+      correct,
+      settings,
+      todayISO(),
+      confidence,
+    );
     await ds.saveProgress(outcome.progress);
     await ds.recordResult(correct);
 
@@ -89,7 +133,8 @@ export const useDrill = create<DrillState>((set, get) => ({
   },
 
   restart: async () => {
-    await get().start(get().topic);
+    const { topic, format, length, hardMode } = get();
+    await get().start({ topic, format, length, hardMode });
   },
 
   quit: () => set({ status: "idle", queue: [], index: 0, results: [] }),
