@@ -1,31 +1,50 @@
 # Rote
 
-A spaced-repetition web app that drills **Python syntax** for coding interviews.
+A spaced-repetition web app that drills **Python syntax** for coding interviews — and tracks your way through the curated LeetCode lists.
+
+### ▶ Try it live: **[rote.bhtran.com](https://rote.bhtran.com)**
+
+No sign-up, nothing to install — it runs entirely in your browser.
 
 Rote is for the developer who can reason out the solution but stalls on the
 syntax while typing it. It's rep-heavy and low-pressure by design: one card at a
-time, immediate feedback, no countdown timers.
+time, immediate feedback, no countdown timers. Everything is local-first — no
+accounts, no backend — and your progress lives in your browser (IndexedDB).
 
-Everything runs locally — no accounts, no backend, no network calls. Progress
-lives in IndexedDB.
+## What you can do
 
-## Features
+**Drill syntax**
+- **Session setup** — before each session, pick the **format** (mixed,
+  multiple-choice, or fill-in-the-blank), a **topic**, the **length**, and
+  whether to use **hard mode**.
+- **Hard mode** — hides the topic and concept while you answer (so the label
+  doesn't give it away), then reveals them with the explanation.
+- **Keyboard-first** — `1`–`4` to choose, `Enter` to submit. After answering,
+  rate your **confidence 1–5**; the rating drives when you'll see the card again.
+- **Leitner spaced repetition** — 5 boxes, due dates default to
+  `[0, 1, 3, 7, 16]` days and are configurable.
 
-- **Drill loop** — multiple-choice and fill-in-the-blank cards, keyboard-first
-  (`1`–`4` to choose, `Enter` to submit, `Enter`/`Space` to advance). The correct
-  answer and a one-line explanation always appear after you answer.
-- **Leitner spaced repetition** — 5 boxes. Correct promotes, wrong resets to box
-  1. Box intervals default to `[0, 1, 3, 7, 16]` days and are configurable.
-- **Dashboard** — streak, today's goal ring, month activity heatmap, per-topic
-  mastery bars.
-- **Topics** — the NeetCode-style roadmap (18 topics), each with a short concept
-  lesson and a "drill this topic" shortcut.
+**Track the lists**
+- **`/problems`** — work through **NeetCode 150, Blind 75, Grind 75, and
+  Pareto 50** with per-list progress bars ("Blind 75: 12/51"). Filter by list,
+  difficulty, topic, and status.
+- **Confidence-driven review** — rate a problem after solving; low confidence
+  schedules it for review, a 5 graduates it out. A "Due for review" view surfaces
+  what's ready.
+- **Per-problem notes** and slug-based **import/export** so you can seed your
+  existing progress.
+
+**Learn ↔ test**
+- **Topic pages** pair a **Learn** tab (concept lesson) with a **Test** tab
+  (drill that topic). Miss a card and "Learn this →" routes you to its lesson.
 - **Cheat sheet** — a searchable single-page Python reference with collapsible
-  sections and copy-code buttons.
-- **Problem of the Day** — one real LeetCode problem per day, weighted toward
-  your weakest topics based on your actual drill data, deep-linked out to
-  LeetCode.
-- **Your data** — export/import progress as JSON.
+  sections, copy-code buttons, and "Drill this →" links.
+
+**See your progress**
+- **Dashboard** — streak, today's goal ring, a month activity heatmap, and
+  per-topic mastery bars.
+- **Problem of the Day** — one real LeetCode problem, weighted toward your
+  weakest topics, deep-linked out to LeetCode.
 
 ## Stack
 
@@ -40,13 +59,15 @@ npm run dev          # http://localhost:3000
 npm run build        # production build
 ```
 
+Or just use the hosted version: **[rote.bhtran.com](https://rote.bhtran.com)**.
+
 ## Project layout
 
 ```
-app/                 routes: dashboard, drill, topics, cheatsheet, settings
+app/                 routes: dashboard, drill, problems, topics, cheatsheet, settings
 components/          hand-rolled UI (no component library)
 content/             cards, topics, lessons, cheat sheet, problem catalog
-lib/                 datastore seam, scheduler, picker, hooks, utils
+lib/                 datastore seam, scheduler, review logic, hooks, utils
 scripts/             offline catalog builder + curated seed lists
 ```
 
@@ -55,10 +76,12 @@ scripts/             offline catalog builder + curated seed lists
 - **`lib/datastore.ts` is the only seam to persistence.** No component or store
   touches Dexie directly, and every method is async — so a network-backed
   implementation can drop in without changing any UI.
-- **Design tokens live in `app/globals.css`** as CSS variables and are surfaced
-  as Tailwind tokens. Change a value once and the whole app re-themes.
-- **Content is plain data** (`content/cards.ts`), so cards can later be
-  generated or imported without touching the UI.
+- **One SRS mapping.** Syntax cards and problem review share the same Leitner
+  boxes (`confidenceToBox` + `dueDateForBox` in `lib/scheduler.ts`).
+- **Design tokens live in `app/globals.css`** as CSS variables surfaced as
+  Tailwind tokens. Change a value once and the whole app re-themes.
+- **Content is plain data** (`content/cards.ts`, `content/problems.json`), so it
+  can be regenerated or imported without touching the UI.
 
 ## Problem catalog
 
@@ -81,6 +104,9 @@ metadata-only enrichment path exists behind a flag if you install the package:
 npm i -D leetcode-query
 npm run build-catalog -- --fetch
 ```
+
+> **Note:** the Pareto 50 list is an approximate high-confidence subset pending
+> the official list — see the flag in `scripts/build-catalog.ts`.
 
 ## Theming
 
